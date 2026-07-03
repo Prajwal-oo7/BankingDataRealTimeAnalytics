@@ -12,6 +12,9 @@ kafka-python-ng
 boto3
 fastparquet
 pandas
+confluent-kafka 
+minio 
+pyarrow
 
 #dbt
 dbt-snowflake
