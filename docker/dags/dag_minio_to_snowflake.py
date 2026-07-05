@@ -36,7 +36,7 @@ SNOWFLAKE_DATABASE = "BANKING_DWH"
 SNOWFLAKE_SCHEMA = "BRONZE"
 
 STAGE_NAME = "MINIO_RAW_STAGE"
-FILE_FORMAT = "PARQUET_FORMAT"
+FILE_FORMAT = "PARQUET_SNAPPY_FORMAT"
 
 TABLE_CONFIG = {
     "customers": "BRONZE_CUSTOMERS_RAW",
@@ -82,6 +82,7 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
     Returns: True / False
     """
     start_time = datetime.now(timezone.utc)
+    rows_loaded=0
     
     try:
         put_sql = f"""
@@ -111,12 +112,13 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
         FILE_FORMAT=(FORMAT_NAME={SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{FILE_FORMAT})
         ON_ERROR='ABORT_STATEMENT';
         """
+        
+        end_time = datetime.now(timezone.utc)
+        duration = (end_time-start_time).total_seconds()
 
         copy_result = snow_hook.get_records(copy_sql)
         logger.info("COPY INTO completed: %s",copy_result)
         
-        end_time = datetime.now(timezone.utc)
-        duration = (end_time-start_time).total_seconds()
         rows_loaded = copy_result[0][3] if copy_result else 0
 
         return {
@@ -135,7 +137,14 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
             """
         snow_hook.run(audit_sql)
         logger.exception("Snowflake load failed for %s: %s", filename, ex)
-        return False
+        
+        return {
+            "success": False,
+            "rows_loaded": rows_loaded,
+            "started_at": start_time,
+            "completed_at": end_time,
+            "duration": duration
+        }
     
     finally:
         try:
