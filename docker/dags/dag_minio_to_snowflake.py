@@ -61,9 +61,7 @@ default_args = {
 
 def discover_files(s3_hook, minio_prefix):
     """
-    Returns parquet files under
-    raw/<table>/
-    sorted oldest first.
+    Returns parquet files under raw/<table>/  sorted oldest first.
     """
     prefix = f"raw/{minio_prefix}/"
     keys = s3_hook.list_keys(bucket_name=MINIO_BUCKET, prefix=prefix) or []
@@ -80,14 +78,12 @@ def discover_files(s3_hook, minio_prefix):
 
 def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
     """
-    Uploads local parquet to Snowflake,
-    loads into Bronze,
-    removes stage file.
+    Uploads local parquet to Snowflake, loads into Bronze, removes stage file.
     Returns: True / False
     """
-
+    start_time = datetime.now(timezone.utc)
+    
     try:
-        start_time = datetime.now(timezone.utc)
         put_sql = f"""
         PUT file://{local_path} @{SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{STAGE_NAME} 
         AUTO_COMPRESS=FALSE OVERWRITE=TRUE;
@@ -98,16 +94,7 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
 
         copy_sql = f"""
         COPY INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{table_name}
-        (
-            ingestion_timestamp,
-            kafka_topic,
-            kafka_partition,
-            kafka_offset,
-            kafka_key,
-            kafka_timestamp,
-            payload,
-            source_file
-        )
+        (ingestion_timestamp, kafka_topic, kafka_partition, kafka_offset, kafka_key, kafka_timestamp, payload, source_file)
         FROM
         (
             SELECT
@@ -132,30 +119,33 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
         duration = (end_time-start_time).total_seconds()
         rows_loaded = copy_result[0][3] if copy_result else 0
 
-
-        audit_sql = f"""
-        INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
-        (table_name, file_name, source_path, rows_loaded, status, error_message, started_at, completed_at, duration_seconds)
-        VALUES
-        ('{table_name}', '{filename}', '{object_key}', {rows_loaded}, 'SUCCESS', NULL, '{start_time}', '{end_time}', {duration});
-        """
-        snow_hook.run(audit_sql)
-
-        remove_sql = f"""REMOVE @{SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{STAGE_NAME}/{filename};"""
-        snow_hook.run(remove_sql)
-
-        return True
-
+        return {
+            "success": True,
+            "rows_loaded": rows_loaded,
+            "started_at": start_time,
+            "completed_at": end_time,
+            "duration": duration
+        }
     except Exception as ex:
         audit_sql = f"""
-        INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
-        (table_name, file_name, source_path, rows_loaded, status, error_message, started_at, completed_at, duration_seconds)
-        VALUES
-        ('{table_name}', '{filename}', '{object_key}', 0, 'FAILED', '{str(ex)}', '{start_time}', CURRENT_TIMESTAMP(), 0);
-        """
+            INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
+            (table_name, file_name, source_path, rows_loaded, status, error_message, started_at, completed_at, duration_seconds)
+            VALUES
+            ('{table_name}', '{filename}', '{object_key}', 0, 'FAILED', '{str(ex).replace("'", "''")}', '{start_time}', CURRENT_TIMESTAMP(), 0);
+            """
         snow_hook.run(audit_sql)
         logger.exception("Snowflake load failed for %s: %s", filename, ex)
         return False
+    
+    finally:
+        try:
+            remove_sql = f"""
+            REMOVE @{SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{STAGE_NAME}/{filename};
+            """
+            snow_hook.run(remove_sql)
+
+        except Exception:
+            logger.warning("Unable to remove %s from Snowflake stage.", filename)
     
 
 # ==========================================================
@@ -164,29 +154,49 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
 
 def archive_file(s3_client, object_key):
     """
-    Moves a successfully processed file
-    raw/
-        ↓
-    processed/
+    Moves file from raw/ to processed/.
+    Returns True if archive succeeded.
     """
-    destination_key = object_key.replace("raw/","processed/",1)
+    destination_key = object_key.replace("raw/", "processed/", 1)
 
-    # Copy
+    # Copy object
     s3_client.copy_object(
         Bucket=MINIO_BUCKET,
-        CopySource={"Bucket": MINIO_BUCKET, "Key": object_key},
+        CopySource={
+            "Bucket": MINIO_BUCKET,
+            "Key": object_key
+        },
         Key=destination_key
     )
 
+    # Verify copied object exists
+    s3_client.head_object(Bucket=MINIO_BUCKET, Key=destination_key)
+
     # Delete original
-    s3_client.delete_object(Bucket=MINIO_BUCKET,Key=object_key)
+    s3_client.delete_object(Bucket=MINIO_BUCKET, Key=object_key)
 
-    logger.info("Archived %s",destination_key)
+    logger.info("Archived %s", destination_key)
 
+    return True
 
 # ==========================================================
 # Process One Table
 # ==========================================================
+
+def already_loaded(snow_hook, object_key):
+    """
+    Returns True if this file has already been successfully loaded.
+    """
+
+    sql = f"""
+    SELECT COUNT(*)
+    FROM {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
+    WHERE source_path = '{object_key}' AND status='SUCCESS';
+    """
+
+    result = snow_hook.get_first(sql)
+    return result[0] > 0
+
 
 def process_table(minio_prefix, snowflake_table):
     """
@@ -211,11 +221,14 @@ def process_table(minio_prefix, snowflake_table):
         local_path = os.path.join(tempfile.gettempdir(), filename)
 
         try:
+            if already_loaded(snow_hook, object_key):
+                logger.info("%s already loaded. Skipping.", object_key)
+                continue
             # Download from MinIO
             s3_client.download_file(MINIO_BUCKET, object_key, local_path)
 
             # Load into Snowflake
-            success = load_to_snowflake(
+            result = load_to_snowflake(
                 snow_hook=snow_hook,
                 local_path=local_path,
                 filename=filename,
@@ -224,13 +237,29 @@ def process_table(minio_prefix, snowflake_table):
             )
 
             # Archive only after successful load
-            if success:
+            if result["success"]:
                 archive_file(s3_client, object_key)
+
+                audit_sql = f"""
+                    INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
+                    (table_name, file_name, source_path, rows_loaded, status, error_message, started_at, completed_at, duration_seconds)
+                    VALUES
+                    ('{snowflake_table}', '{filename}', '{object_key}', {result["rows_loaded"]}, 'SUCCESS', NULL, '{result["started_at"]}', '{result["completed_at"]}', {result["duration"]});
+                    """
+                snow_hook.run(audit_sql)
+
                 logger.info("Finished %s", filename)
             else:
                 logger.warning("Skipping archive because Snowflake load failed : %s", filename)
 
         except Exception as ex:
+            audit_sql = f"""
+                INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
+                (table_name, file_name, source_path, rows_loaded, status, error_message, started_at, completed_at, duration_seconds)
+                VALUES
+                ('{snowflake_table}', '{filename}', '{object_key}', 0, 'FAILED', '{str(ex).replace("'", "''")}', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), NULL);
+                """
+            snow_hook.run(audit_sql)
             logger.exception( "Failed processing %s : %s", object_key, ex)
 
         finally:
