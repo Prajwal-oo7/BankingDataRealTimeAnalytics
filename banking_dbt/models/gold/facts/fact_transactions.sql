@@ -26,8 +26,7 @@ SELECT
 FROM {{ ref('stg_transactions') }} t
 LEFT JOIN {{ ref('dim_accounts') }} a
     ON t.account_id = a.account_id
-    AND t.transaction_date >= a.effective_from
-    AND t.transaction_date < COALESCE(a.effective_to, TO_TIMESTAMP_NTZ('9999-12-31'))
+    AND a.is_current = TRUE
 
 WHERE ( t.cdc_operation != 'd' OR t.cdc_operation IS NULL )
 

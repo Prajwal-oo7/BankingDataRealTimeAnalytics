@@ -13,7 +13,7 @@
     )
 }}
 
-SELECT * FROM {{ ref('stg_accounts') }}
+SELECT * FROM {{ ref('stg_accounts') }} WHERE cdc_operation != 'd'
 
 --
 {% endsnapshot %}
