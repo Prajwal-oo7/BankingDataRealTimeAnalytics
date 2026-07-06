@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: "Raw CDC data loaded from MinIO into Snowflake Bronze."
+
+    database: BANKING_DWH
+    schema: BRONZE
+    tables:
+      - name: BRONZE_CUSTOMERS_RAW
+      - name: BRONZE_ACCOUNTS_RAW
+      - name: BRONZE_TRANSACTIONS_RAW
