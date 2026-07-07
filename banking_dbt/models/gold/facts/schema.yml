@@ -1,0 +1,56 @@
+version: 2
+
+models:
+
+  - name: fact_transactions
+    description: Transaction fact table.
+
+    columns:
+
+      - name: transaction_sk
+        tests:
+          - unique
+          - not_null
+
+      - name: transaction_id
+        tests:
+          - unique
+          - not_null
+
+      - name: account_sk
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_accounts')
+                field: account_sk
+
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+
+      - name: amount
+        tests:
+          - not_null
+
+      - name: transaction_type
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - DEPOSIT
+                  - WITHDRAWAL
+                  - TRANSFER
+
+      - name: transaction_status
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - COMPLETED
+                  - FAILED
+                  - PENDING

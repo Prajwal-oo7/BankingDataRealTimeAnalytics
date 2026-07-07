@@ -1,0 +1,69 @@
+version: 2
+
+models:
+
+  - name: dim_customers
+    description: Customer dimension with SCD Type 2 history.
+
+    columns:
+
+      - name: customer_sk
+        tests:
+          - unique
+          - not_null
+
+      - name: customer_id
+        tests:
+          - not_null
+      
+      - name: email
+        tests:
+          - not_null
+
+      - name: is_current
+        tests:
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
+  - name: dim_accounts
+    description: Account dimension with SCD Type 2 history.
+
+    columns:
+
+      - name: account_sk
+        tests:
+          - unique
+          - not_null
+
+      - name: account_id
+        tests:
+          - not_null
+
+      - name: customer_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+
+      - name: account_type
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - Checking
+                  - Savings
+      
+      - name: account_status
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - Active
+                  - Closed
+                  - Frozen
+                
+      - name: is_current
+        tests:
+          - not_null

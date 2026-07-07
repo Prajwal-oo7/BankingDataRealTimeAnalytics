@@ -1,0 +1,61 @@
+version: 2
+
+models:
+
+  - name: customer_summary
+
+    columns:
+
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+
+      - name: total_accounts
+        tests:
+          - not_null
+
+      - name: current_total_balance
+        tests:
+          - not_null
+
+      - name: total_transactions
+        tests:
+          - not_null
+
+
+  - name: account_summary
+
+    columns:
+
+      - name: account_id
+        tests:
+          - unique
+          - not_null
+
+      - name: customer_id
+        tests:
+          - not_null
+
+      - name: balance
+        tests:
+          - not_null
+
+
+  - name: fraud_monitoring
+
+    columns:
+
+      - name: transaction_id
+        tests:
+          - unique
+          - not_null
+
+      - name: fraud_flag
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - NORMAL
+                  - SUSPICIOUS
+                  - HIGH_RISK

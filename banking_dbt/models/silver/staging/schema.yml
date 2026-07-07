@@ -1,0 +1,95 @@
+version: 2
+
+models:
+
+  - name: stg_customers
+    description: Flattened customer CDC events
+
+    columns:
+
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+
+      - name: first_name
+        tests:
+          - not_null
+
+      - name: last_name
+        tests:
+          - not_null
+
+      - name: email
+        tests:
+          - not_null
+
+  - name: stg_accounts
+    description: Flattened account CDC events
+
+    columns:
+
+      - name: account_id
+        tests:
+          - unique
+          - not_null
+
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: account_type
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - Checking
+                  - Savings
+
+      - name: account_status
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - Active
+                  - Closed
+
+  - name: stg_transactions
+    description: Flattened transaction CDC events
+    
+    columns:
+
+      - name: transaction_id
+        tests:
+          - unique
+          - not_null
+
+      - name: account_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_accounts')
+                field: account_id
+
+      - name: transaction_status
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - COMPLETED
+                  - FAILED
+                  - PENDING
+
+      - name: transaction_type
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - DEPOSIT
+                  - WITHDRAWAL
+                  - TRANSFER
