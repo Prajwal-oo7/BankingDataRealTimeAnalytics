@@ -7,6 +7,9 @@ from datetime import datetime, timedelta, timezone
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
+from airflow.utils.trigger_rule import TriggerRule
+from airflow.operators.empty import EmptyOperator
 
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
@@ -44,15 +47,7 @@ TABLE_CONFIG = {
     "transactions": "BRONZE_TRANSACTIONS_RAW"
 }
 
-
-default_args = {
-    "owner": "data-engineering",
-    "depends_on_past": False,
-    "retries": 2,
-    "retry_delay": timedelta(minutes=2),
-    "email_on_failure": False,
-    "email_on_retry": False
-}
+DBT_PROJECT_DIR = '/opt/airflow/banking_dbt' # Mapped via docker-compose volume
 
 
 # ==========================================================
@@ -112,11 +107,11 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
         FILE_FORMAT=(FORMAT_NAME={SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.{FILE_FORMAT})
         ON_ERROR='ABORT_STATEMENT';
         """
-        
+
+        copy_result = snow_hook.get_records(copy_sql)
         end_time = datetime.now(timezone.utc)
         duration = (end_time-start_time).total_seconds()
 
-        copy_result = snow_hook.get_records(copy_sql)
         logger.info("COPY INTO completed: %s",copy_result)
         
         rows_loaded = copy_result[0][3] if copy_result else 0
@@ -136,6 +131,8 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
             ('{table_name}', '{filename}', '{object_key}', 0, 'FAILED', '{str(ex).replace("'", "''")}', '{start_time}', CURRENT_TIMESTAMP(), 0);
             """
         snow_hook.run(audit_sql)
+        end_time = datetime.now(timezone.utc)
+        duration = (end_time-start_time).total_seconds()
         logger.exception("Snowflake load failed for %s: %s", filename, ex)
         
         return {
@@ -280,8 +277,18 @@ def process_table(minio_prefix, snowflake_table):
 # DAG
 # ==========================================================
 
+default_args = {
+    "owner": "data-engineering",
+    "depends_on_past": False,
+    "retries": 2,
+    "retry_delay": timedelta(minutes=2),
+    "email_on_failure": False,
+    "email_on_retry": False
+}
+
+
 with DAG(
-    dag_id="minio_to_snowflake_bronze",
+    dag_id="minio_to_snowflake_Gold",
     description="Load CDC Parquet files from MinIO to Snowflake Bronze",
     start_date=datetime(2025, 1, 1),
     schedule="*/2 * * * *",
@@ -291,10 +298,38 @@ with DAG(
     tags=["banking", "bronze", "snowflake", "cdc"]
 ) as dag:
     
-    previous_task = None
+    # 1. dbt Tasks using BashOperator
+    # We use --project-dir and --profiles-dir to tell dbt exactly where the configs are
 
+    dbt_run_staging = BashOperator(
+        task_id='dbt_run_silver_staging',
+        bash_command=f"dbt run --select silver/staging --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR}/.dbt --no-partial-parse"
+
+    )
+
+    dbt_run_snapshot = BashOperator(
+        task_id="dbt_run_scd2_snapshots",
+        bash_command=f"dbt snapshot --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR}/.dbt --no-partial-parse",
+        trigger_rule=TriggerRule.ALL_SUCCESS
+    )
+
+    dbt_run_gold= BashOperator(
+        task_id="dbt_run_gold_models",
+        bash_command=f"dbt run --select gold --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR}/.dbt --no-partial-parse"
+    )
+
+    dbt_run_test = BashOperator(
+        task_id="dbt_test",
+        bash_command=f"dbt test --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR}/.dbt --no-partial-parse"
+    )
+
+    pipeline_completed = EmptyOperator(
+        task_id="pipeline_completed"
+    )
+
+    # 2. Dynamic MinIO to Snowflake Tasks & Dependencies
     for dataset, table in TABLE_CONFIG.items():
-        task = PythonOperator(
+        ingest_task = PythonOperator(
             task_id=f"load_{dataset}",
             python_callable=process_table,
             op_kwargs={
@@ -303,7 +338,9 @@ with DAG(
             }
         )
 
-        if previous_task:
-            previous_task >> task
-
-        previous_task = task
+        # Dependency Chain: 
+        # Ingest -> Staging (Silver) -> Snapshots (History) -> (Gold)  -> test
+        ingest_task >> dbt_run_staging
+        
+    # Link the dbt steps sequentially
+    dbt_run_staging >> dbt_run_snapshot >> dbt_run_gold >> dbt_run_test >> pipeline_completed
