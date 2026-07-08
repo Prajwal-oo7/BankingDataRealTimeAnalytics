@@ -6,6 +6,8 @@ docker/logs/
 docker/minio/
 docker/plugins/
 docker/postgres/
+docker/kafka/
+docker/zookeeper/
 
 # DBT cache
 banking_dbt/.dbt/

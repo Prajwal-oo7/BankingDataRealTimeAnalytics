@@ -13,7 +13,7 @@
     )
 }}
 
-SELECT * FROM {{ ref('stg_customers') }} WHERE cdc_operation != 'd'
+SELECT * FROM {{ ref('stg_customers') }} WHERE cdc_operation <> 'd' OR cdc_operation IS NULL
 
 --
 {% endsnapshot %}

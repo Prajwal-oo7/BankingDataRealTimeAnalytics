@@ -38,11 +38,7 @@ connector_config = {
         # -----------------------------
         # Capture only required tables
         # -----------------------------
-        "table.include.list":
-            "public.customers,"
-            "public.accounts,"
-            "public.transactions",
-
+        "table.include.list": "public.customers,public.accounts,public.transactions",
         # -----------------------------
         # PostgreSQL logical replication
         # -----------------------------
@@ -55,12 +51,16 @@ connector_config = {
         # Snapshot
         # -----------------------------
         "snapshot.mode": "initial",
+        "snapshot.locking.mode": "none",
 
         # -----------------------------
         # Data handling
         # -----------------------------
         "decimal.handling.mode": "double",
         "tombstones.on.delete": "false",
+
+        "slot.drop.on.stop": "false",
+        "heartbeat.interval.ms": "10000",
 
         # -----------------------------
         # Kafka Connect JSON converters
@@ -98,13 +98,18 @@ def deploy_connector():
 
     for attempt in range(MAX_RETRIES):
         try:
-            response = requests.post(url, headers=headers, json=connector_config, timeout=10 )
+            existing = requests.get(f"{url}/{CONNECTOR_NAME}")
+            if existing.status_code == 200:
+                print(f"Connector '{CONNECTOR_NAME}' already exists.")
+                return
             
+            response = requests.post(url, headers=headers, json=connector_config, timeout=10 )
+        
             # for changing configs : Change method to PUT, and pass ONLY the "config" dictionary as the payload
             #response = requests.put(upd_url, headers=headers, json=connector_config["config"])
 
             if response.status_code == 201:
-                print("Connector deployed successfully.")
+                print("Connector created and deployed successfully.")
                 return
 
             elif response.status_code == 409:

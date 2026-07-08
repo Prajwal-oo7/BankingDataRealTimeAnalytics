@@ -42,9 +42,16 @@ flattened AS (
 ),
 -- filtering, deduplication, business logic
 final AS (
-    SELECT *
-    FROM flattened
+    SELECT * FROM flattened
     WHERE customer_id IS NOT NULL
+    QUALIFY ROW_NUMBER() OVER(PARTITION BY customer_id
+        ORDER BY
+            updated_at DESC,
+            source_lsn DESC,
+            kafka_partition DESC,
+            kafka_offset DESC,
+            ingestion_timestamp DESC
+    )=1
 )
 
 SELECT

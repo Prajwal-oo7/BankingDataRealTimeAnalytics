@@ -303,7 +303,7 @@ with DAG(
 
     dbt_run_staging = BashOperator(
         task_id='dbt_run_silver_staging',
-        bash_command=f"dbt run --select silver/staging --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR}/.dbt --no-partial-parse"
+        bash_command=f"dbt run --select silver.staging.* --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR}/.dbt --no-partial-parse"
 
     )
 

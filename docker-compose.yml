@@ -10,6 +10,8 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    volumes:
+      - ./docker/zookeeper/data:/var/lib/zookeeper/data
 
   kafka:
     image: confluentinc/cp-kafka:7.4.1
@@ -29,6 +31,9 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    
+    volumes:
+    - ./docker/kafka/data:/var/lib/kafka/data
 
   # Kafka Connect (Debezium CDC)
   connect:
