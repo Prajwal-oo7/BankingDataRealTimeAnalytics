@@ -3,7 +3,15 @@ version: 2
 models:
 
   - name: stg_customers
-    description: Flattened customer CDC events
+    description: Flattened deduplicated latest customer records from CDC events
+
+    config:
+      tags:
+        - silver
+        - staging
+
+      meta:
+        owner: Data Engineering Team
 
     columns:
 
@@ -25,7 +33,15 @@ models:
           - not_null
 
   - name: stg_accounts
-    description: Flattened account CDC events
+    description: Flattened deduplicated latest account records from CDC events
+
+    config:
+      tags:
+        - silver
+        - staging
+
+      meta:
+        owner: Data Engineering Team
 
     columns:
 
@@ -58,8 +74,17 @@ models:
                   - Active
                   - Closed
 
+
   - name: stg_transactions
-    description: Flattened transaction CDC events
+    description: Flattened deduplicated latest transaction records from CDC events
+
+    config:
+      tags:
+        - silver
+        - staging
+
+      meta:
+        owner: Data Engineering Team
     
     columns:
 

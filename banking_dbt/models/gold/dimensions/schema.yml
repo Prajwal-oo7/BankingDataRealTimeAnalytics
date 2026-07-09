@@ -3,44 +3,94 @@ version: 2
 models:
 
   - name: dim_customers
-    description: Customer dimension with SCD Type 2 history.
+    description: >
+      Slowly Changing Dimension (Type 2) storing the complete
+      history of customer accounts using dbt snapshots.
+    
+    config:
+      tags:
+        - gold
+        - dim
+
+      meta:
+        owner: Data Engineering
+        layer: Gold
+        business_domain: Banking
 
     columns:
 
       - name: customer_sk
+        description: Surrogate key generated for dimensional modeling.
         tests:
           - unique
           - not_null
 
       - name: customer_id
-        tests:
-          - not_null
-      
-      - name: email
+        description: Business key from PostgreSQL OLTP database.
         tests:
           - not_null
 
+      - name: first_name
+        description: Customer first name.
+
+      - name: last_name
+        description: Customer last name.
+
+      - name: email
+        description: Customer email address.
+        tests:
+          - not_null
+
+      - name: phone
+        description: Customer phone number.
+
+      - name: city
+        description: Customer city.
+
+      - name: effective_from
+        description: Timestamp when this customer version became active.
+
+      - name: effective_to
+        description: Timestamp when this version expired.
+
       - name: is_current
+        description: Indicates whether this is the active customer record.
         tests:
           - accepted_values:
               arguments:
                 values: [true, false]
 
+
   - name: dim_accounts
-    description: Account dimension with SCD Type 2 history.
+    description: >
+      Slowly Changing Dimension (Type 2) storing the complete
+      history of customer accounts using dbt snapshots.
+
+    config:
+      tags:
+        - gold
+        - dim
+
+      meta:
+        owner: Data Engineering
+        layer: Gold
+        business_domain: Banking
 
     columns:
 
       - name: account_sk
+        description: Surrogate key for account dimension.
         tests:
           - unique
           - not_null
 
       - name: account_id
+        description: Business account identifier.
         tests:
           - not_null
 
       - name: customer_id
+        description: Customer owning the account.
         tests:
           - relationships:
               arguments:
@@ -48,6 +98,7 @@ models:
                 field: customer_id
 
       - name: account_type
+        description: Checking or Savings account.
         tests:
           - accepted_values:
               arguments:
@@ -56,6 +107,7 @@ models:
                   - Savings
       
       - name: account_status
+        description: Current account status.
         tests:
           - accepted_values:
               arguments:
@@ -63,7 +115,20 @@ models:
                   - Active
                   - Closed
                   - Frozen
-                
+
+      - name: currency
+        description: Account currency.
+
+      - name: balance
+        description: Current account balance.
+
+      - name: effective_from
+        description: Start timestamp of account version.
+
+      - name: effective_to
+        description: End timestamp of account version.
+
       - name: is_current
+        description: Indicates active account version.                
         tests:
           - not_null

@@ -1,0 +1,11 @@
+version: 2
+
+snapshots:
+
+  - name: customers_snapshot
+    description: >
+      SCD Type 2 history of customers captured using dbt snapshots.
+
+  - name: accounts_snapshot
+    description: >
+      Historical versions of bank accounts.

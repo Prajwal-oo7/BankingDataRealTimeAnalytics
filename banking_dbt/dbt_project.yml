@@ -36,9 +36,9 @@ models:
   banking_dbt:
     # Config indicated by + and applies to all files under models/example/
 
-    bronze:
-      +materialized: view
-      +schema: BRONZE
+    # bronze:
+    #   +materialized: view
+    #   +schema: BRONZE
 
     silver:
       +materialized: table
@@ -52,6 +52,6 @@ snapshots:
   banking_dbt:
     +target_schema: SNAPSHOTS
 
-seeds:
-  banking_dbt:
-    +schema: SEED
+# seeds:
+#   banking_dbt:
+#     +schema: SEED

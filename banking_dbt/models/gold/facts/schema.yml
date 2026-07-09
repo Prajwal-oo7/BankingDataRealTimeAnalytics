@@ -3,21 +3,36 @@ version: 2
 models:
 
   - name: fact_transactions
-    description: Transaction fact table.
+    description: >
+      Transaction fact table containing one row per banking
+      transaction enriched with account dimension information.
+
+    config:
+      tags:
+        - gold
+        - fact
+
+      meta:
+        owner: Data Engineering
+        layer: Gold
+        business_domain: Banking
 
     columns:
 
       - name: transaction_sk
+        description: Surrogate key for transaction.
         tests:
           - unique
           - not_null
 
       - name: transaction_id
+        description: Business transaction identifier.
         tests:
           - unique
           - not_null
 
       - name: account_sk
+        description: Foreign key to Dim Accounts.
         tests:
           - not_null
           - relationships:
@@ -26,6 +41,7 @@ models:
                 field: account_sk
 
       - name: customer_id
+        description: Customer performing the transaction.
         tests:
           - not_null
           - relationships:
@@ -34,10 +50,12 @@ models:
                 field: customer_id
 
       - name: amount
+        description: Transaction amount.
         tests:
           - not_null
 
       - name: transaction_type
+        description: Deposit, Withdrawal or Transfer.
         tests:
           - accepted_values:
               arguments:
@@ -47,6 +65,7 @@ models:
                   - TRANSFER
 
       - name: transaction_status
+        description: Processing status.
         tests:
           - accepted_values:
               arguments:
@@ -54,3 +73,6 @@ models:
                   - COMPLETED
                   - FAILED
                   - PENDING
+
+      - name: transaction_date
+        description: Transaction timestamp.

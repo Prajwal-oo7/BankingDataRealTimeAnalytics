@@ -1,12 +1,22 @@
 version: 2
 
 sources:
-  - name: bronze
-    description: "Raw CDC data loaded from MinIO into Snowflake Bronze."
 
+  - name: bronze
     database: BANKING_DWH
     schema: BRONZE
+
+    description: >
+      Raw Debezium CDC events ingested from PostgreSQL through
+      Kafka, Debezium and MinIO into Snowflake Bronze layer.
+
     tables:
+
       - name: BRONZE_CUSTOMERS_RAW
+        description: Raw customer CDC events.
+
       - name: BRONZE_ACCOUNTS_RAW
+        description: Raw account CDC events.
+
       - name: BRONZE_TRANSACTIONS_RAW
+        description: Raw transaction CDC events.

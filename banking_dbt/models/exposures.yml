@@ -1,0 +1,30 @@
+version: 2
+
+exposures:
+
+  - name: powerbi_dashboard
+
+    label: Banking Analytics Dashboard
+
+    type: dashboard
+
+    maturity: high
+
+    url: https://app.powerbi.com
+
+    description: >
+      Executive dashboard showing
+      customer KPIs,
+      fraud metrics,
+      account activity,
+      transaction analytics.
+
+    depends_on:
+
+      - ref('customer_summary')
+      - ref('account_summary')
+      - ref('fraud_monitoring')
+
+    owner:
+
+      name: Data Engineering

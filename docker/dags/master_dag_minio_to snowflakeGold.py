@@ -14,6 +14,9 @@ from airflow.operators.empty import EmptyOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
 
+from airflow.operators.python import PythonOperator
+from utils import notify_failure, notify_pipeline_success
+
 
 # ==========================================================
 # Logging
@@ -283,8 +286,10 @@ default_args = {
     "depends_on_past": False,
     "retries": 2,
     "retry_delay": timedelta(minutes=2),
-    "email_on_failure": False,
-    "email_on_retry": False
+    "email": ["7171iron@gmail.com"],
+    "email_on_failure": True,
+    "email_on_retry": False,
+    "on_failure_callback": notify_failure
 }
 
 
@@ -324,8 +329,9 @@ with DAG(
         bash_command=f"dbt test --project-dir {DBT_PROJECT_DIR} --profiles-dir {DBT_PROJECT_DIR}/.dbt --no-partial-parse"
     )
 
-    pipeline_completed = EmptyOperator(
-        task_id="pipeline_completed"
+    pipeline_completed = PythonOperator(
+        task_id="pipeline_completed",
+        python_callable=notify_pipeline_success
     )
 
     # 2. Dynamic MinIO to Snowflake Tasks & Dependencies
