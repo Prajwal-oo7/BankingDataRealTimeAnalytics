@@ -38,7 +38,10 @@ connector_config = {
         # -----------------------------
         # Capture only required tables
         # -----------------------------
-        "table.include.list": "public.customers,public.accounts,public.transactions",
+        "table.include.list":
+            "public.customers,"
+            "public.accounts,"
+            "public.transactions",
         # -----------------------------
         # PostgreSQL logical replication
         # -----------------------------

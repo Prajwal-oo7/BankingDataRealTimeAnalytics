@@ -32,6 +32,8 @@ WHERE ( t.cdc_operation != 'd' OR t.cdc_operation IS NULL )
 
 {% if is_incremental() %}
     
-    AND t.ingestion_timestamp > (SELECT COALESCE(MAX(ingestion_timestamp),'1900-01-01') FROM {{ this }})
+    AND ( t.ingestion_timestamp > (SELECT COALESCE(MAX(ingestion_timestamp),'1900-01-01') FROM {{ this }})
+            OR t.transaction_id NOT IN(SELECT transaction_id FROM {{ this }})
+    )
 
 {% endif %}

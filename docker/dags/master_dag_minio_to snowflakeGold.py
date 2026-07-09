@@ -37,6 +37,7 @@ MINIO_BUCKET = "banking-data"
 
 SNOWFLAKE_DATABASE = "BANKING_DWH"
 SNOWFLAKE_SCHEMA = "BRONZE"
+SNOWFLAKE_SCHEMA_AUDIT = "AUDIT"
 
 STAGE_NAME = "MINIO_RAW_STAGE"
 FILE_FORMAT = "PARQUET_SNAPPY_FORMAT"
@@ -125,7 +126,7 @@ def load_to_snowflake(snow_hook, local_path, filename, object_key, table_name):
         }
     except Exception as ex:
         audit_sql = f"""
-            INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
+            INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA_AUDIT}.INGESTION_AUDIT
             (table_name, file_name, source_path, rows_loaded, status, error_message, started_at, completed_at, duration_seconds)
             VALUES
             ('{table_name}', '{filename}', '{object_key}', 0, 'FAILED', '{str(ex).replace("'", "''")}', '{start_time}', CURRENT_TIMESTAMP(), 0);
@@ -196,7 +197,7 @@ def already_loaded(snow_hook, object_key):
 
     sql = f"""
     SELECT COUNT(*)
-    FROM {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
+    FROM {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA_AUDIT}.INGESTION_AUDIT
     WHERE source_path = '{object_key}' AND status='SUCCESS';
     """
 
@@ -247,7 +248,7 @@ def process_table(minio_prefix, snowflake_table):
                 archive_file(s3_client, object_key)
 
                 audit_sql = f"""
-                    INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
+                    INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA_AUDIT}.INGESTION_AUDIT
                     (table_name, file_name, source_path, rows_loaded, status, error_message, started_at, completed_at, duration_seconds)
                     VALUES
                     ('{snowflake_table}', '{filename}', '{object_key}', {result["rows_loaded"]}, 'SUCCESS', NULL, '{result["started_at"]}', '{result["completed_at"]}', {result["duration"]});
@@ -260,7 +261,7 @@ def process_table(minio_prefix, snowflake_table):
 
         except Exception as ex:
             audit_sql = f"""
-                INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA}.INGESTION_AUDIT
+                INSERT INTO {SNOWFLAKE_DATABASE}.{SNOWFLAKE_SCHEMA_AUDIT}.INGESTION_AUDIT
                 (table_name, file_name, source_path, rows_loaded, status, error_message, started_at, completed_at, duration_seconds)
                 VALUES
                 ('{snowflake_table}', '{filename}', '{object_key}', 0, 'FAILED', '{str(ex).replace("'", "''")}', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(), NULL);
@@ -291,7 +292,7 @@ with DAG(
     dag_id="minio_to_snowflake_Gold",
     description="Load CDC Parquet files from MinIO to Snowflake Bronze",
     start_date=datetime(2025, 1, 1),
-    schedule="*/2 * * * *",
+    schedule="*/4 * * * *",
     catchup=False,
     max_active_runs=1,
     default_args=default_args,

@@ -40,7 +40,7 @@ TOPICS = [
 ]
 
 FLUSH_SIZE = 50
-FLUSH_INTERVAL = 60          # seconds
+FLUSH_INTERVAL = 120          # seconds
 MAX_BUFFER_SIZE=5000
 
 LOCAL_STAGING = Path("./tmp")
@@ -280,6 +280,7 @@ def flush_topic(topic):
 
 def check_flush():
     current = time.time()
+    logger.info("Waiting for 120 seconds or 50 records to complete !")
     for topic in TOPICS:
         if len(buffers[topic]) >= FLUSH_SIZE:
             flush_topic(topic)
