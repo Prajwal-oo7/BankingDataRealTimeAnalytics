@@ -29,7 +29,7 @@ SELECT
     END AS fraud_flag
 FROM {{ ref('fact_transactions') }} as f
 LEFT JOIN hourly_activity as h
-    ON 
+    ON
         f.account_id = h.account_id
         AND DATE_TRUNC('hour', f.transaction_date) = h.transaction_hour
 --
