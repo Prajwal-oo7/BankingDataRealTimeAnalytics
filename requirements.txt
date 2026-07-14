@@ -17,4 +17,10 @@ minio
 pyarrow
 
 #dbt
-dbt-snowflake
+dbt-snowflake>=1.11.6
+
+#ci/cd
+ruff
+pytest
+sqlfluff
+sqlfluff-templater-dbt

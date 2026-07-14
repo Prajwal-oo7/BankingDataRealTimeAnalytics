@@ -2,14 +2,13 @@ import os
 import tempfile
 import logging
 
-from pathlib import Path
+#from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 from airflow import DAG
-from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.utils.trigger_rule import TriggerRule
-from airflow.operators.empty import EmptyOperator
+#from airflow.operators.empty import EmptyOperator
 
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
