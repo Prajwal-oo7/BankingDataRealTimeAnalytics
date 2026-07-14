@@ -14,24 +14,25 @@ WITH bronze AS (
     FROM {{ source('bronze','BRONZE_ACCOUNTS_RAW') }}
 ),
 -- Business Columns(parsed, json extraction, datatype conversion)
+
 flattened AS (
     SELECT
         -- Business Columns
-        TRY_TO_NUMBER(payload:after:account_id::STRING)           AS account_id,
-        TRY_TO_NUMBER(payload:after:customer_id::STRING)          AS customer_id,
-        payload:after:account_type::STRING                        AS account_type,
-        payload:after:account_status::STRING                      AS account_status,
-        payload:after:currency::STRING                            AS currency,
-        TRY_TO_DECIMAL(payload:after:balance::STRING,18,2)        AS balance,
-        TRY_TO_TIMESTAMP_NTZ(payload:after:created_at::STRING)    AS created_at,
-        TRY_TO_TIMESTAMP_NTZ(payload:after:updated_at::STRING)    AS updated_at,
+        TRY_TO_NUMBER(payload:after:account_id::STRING) AS account_id,
+        TRY_TO_NUMBER(payload:after:customer_id::STRING) AS customer_id,
+        payload:after:account_type::STRING AS account_type,
+        payload:after:account_status::STRING AS account_status,
+        payload:after:currency::STRING AS currency,
+        TRY_TO_DECIMAL(payload:after:balance::STRING, 18, 2) AS balance,
+        TRY_TO_TIMESTAMP_NTZ(payload:after:created_at::STRING) AS created_at,
+        TRY_TO_TIMESTAMP_NTZ(payload:after:updated_at::STRING) AS updated_at,
         -- CDC Metadata
-        payload:op::STRING                                        AS cdc_operation,
-        payload:source:snapshot::STRING                           AS snapshot_flag,
-        TRY_TO_NUMBER(payload:source:lsn::STRING)                 AS source_lsn,
-        TRY_TO_NUMBER(payload:source:txId::STRING)                AS transaction_id,
-        payload:source:table::STRING                              AS source_table,
-        payload:source:schema::STRING                             AS source_schema,
+        payload:op::STRING AS cdc_operation,
+        payload:source:snapshot::STRING AS snapshot_flag,
+        TRY_TO_NUMBER(payload:source:lsn::STRING) AS source_lsn,
+        TRY_TO_NUMBER(payload:source:txId::STRING) AS transaction_id,
+        payload:source:table::STRING AS source_table,
+        payload:source:schema::STRING AS source_schema,
         -- Kafka Metadata
         kafka_topic,
         kafka_partition,
@@ -43,17 +44,19 @@ flattened AS (
     FROM bronze
 ),
 -- filtering, deduplication, business logic
+
 final AS (
     SELECT * FROM flattened
     WHERE account_id IS NOT NULL
-    QUALIFY ROW_NUMBER() OVER(PARTITION BY account_id
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY account_id
         ORDER BY
             updated_at DESC,
             source_lsn DESC,
             kafka_partition DESC,
             kafka_offset DESC,
             ingestion_timestamp DESC
-    )=1
+    ) = 1
 )
 
 SELECT
@@ -81,3 +84,4 @@ SELECT
     ingestion_timestamp,
     source_file
 FROM final
+--

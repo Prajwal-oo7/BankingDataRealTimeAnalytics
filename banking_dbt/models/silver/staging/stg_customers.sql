@@ -14,22 +14,23 @@ WITH bronze AS (
     FROM {{ source('bronze','BRONZE_CUSTOMERS_RAW') }}
 ),
 -- Business Columns(parsed, json extraction, datatype conversion)
+
 flattened AS (
     SELECT
-        TRY_TO_NUMBER(payload:after:customer_id::STRING)      AS customer_id,
-        payload:after:first_name::STRING             AS first_name,
-        payload:after:last_name::STRING              AS last_name,
-        payload:after:email::STRING                  AS email,
-        payload:after:phone::STRING                  AS phone,
-        TRY_TO_TIMESTAMP_NTZ(payload:after:created_at::STRING)      AS created_at,
-        TRY_TO_TIMESTAMP_NTZ(payload:after:updated_at::STRING)      AS updated_at,
+        TRY_TO_NUMBER(payload:after:customer_id::STRING) AS customer_id,
+        payload:after:first_name::STRING AS first_name,
+        payload:after:last_name::STRING AS last_name,
+        payload:after:email::STRING AS email,
+        payload:after:phone::STRING AS phone,
+        TRY_TO_TIMESTAMP_NTZ(payload:after:created_at::STRING) AS created_at,
+        TRY_TO_TIMESTAMP_NTZ(payload:after:updated_at::STRING) AS updated_at,
         -- CDC Metadata
-        payload:op::STRING                           AS cdc_operation,
-        payload:source:snapshot::STRING              AS snapshot_flag,
-        TRY_TO_NUMBER(payload:source:lsn::STRING)    AS source_lsn,
-        TRY_TO_NUMBER(payload:source:txId::STRING)   AS transaction_id,
-        payload:source:table::STRING                 AS source_table,
-        payload:source:schema::STRING                AS source_schema,
+        payload:op::STRING AS cdc_operation,
+        payload:source:snapshot::STRING AS snapshot_flag,
+        TRY_TO_NUMBER(payload:source:lsn::STRING) AS source_lsn,
+        TRY_TO_NUMBER(payload:source:txId::STRING) AS transaction_id,
+        payload:source:table::STRING AS source_table,
+        payload:source:schema::STRING AS source_schema,
         -- Kafka Metadata
         kafka_topic,
         kafka_partition,
@@ -41,17 +42,19 @@ flattened AS (
     FROM bronze
 ),
 -- filtering, deduplication, business logic
+
 final AS (
     SELECT * FROM flattened
     WHERE customer_id IS NOT NULL
-    QUALIFY ROW_NUMBER() OVER(PARTITION BY customer_id
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY customer_id
         ORDER BY
             updated_at DESC,
             source_lsn DESC,
             kafka_partition DESC,
             kafka_offset DESC,
             ingestion_timestamp DESC
-    )=1
+    ) = 1
 )
 
 SELECT
@@ -76,3 +79,4 @@ SELECT
     ingestion_timestamp,
     source_file
 FROM final
+--
