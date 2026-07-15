@@ -1,0 +1,1 @@
+SELECT * FROM {{ ref('fact_transactions') }} WHERE amount <= 0
