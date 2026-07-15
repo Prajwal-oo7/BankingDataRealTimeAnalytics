@@ -57,13 +57,11 @@ jobs:
         working-directory: banking_dbt          #or cd banking_dbt
         run: |
           dbt deps
-          dbt test
-        # validates production data
 
       - name: Deploy Models
         working-directory: banking_dbt
         run: dbt build
-        # builds production models on Snowflake
+        # builds production models on Snowflake and tests
 
       - name: Generate Documentation
         working-directory: banking_dbt
