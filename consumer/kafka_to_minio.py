@@ -1,7 +1,8 @@
-import json
+#import json
 import logging
 import os
-import time, uuid
+import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -99,7 +100,7 @@ for attempt in range(1, 11):
             logger.info(f"Using existing bucket : {MINIO_BUCKET}")
         break
     except Exception as e:
-        logger.warning(f"MinIO not ready ({attempt}/10). Retrying in 3s...")
+        logger.warning(f"MinIO not ready ({attempt}/10) | error: {e} | Retrying in 3s...")
         time.sleep(3)
 
 else:
@@ -161,8 +162,10 @@ def buffer_message(msg):
 
     # Handle Kafka Timestamps
     timestamp_type, kafka_ts = msg.timestamp()              #(timestamp_type, timestamp_ms)
-    if kafka_ts: kafka_ts = datetime.fromtimestamp(kafka_ts / 1000,tz=timezone.utc).isoformat()
-    else: kafka_ts = None
+    if kafka_ts:
+        kafka_ts = datetime.fromtimestamp(kafka_ts / 1000,tz=timezone.utc).isoformat()
+    else:
+        kafka_ts = None
     
     # FIXED: Handle Debezium Delete Tombstones (value is None)
     raw_value = msg.value()
@@ -336,6 +339,9 @@ def shutdown():
 # ==========================================================
 
 if __name__ == "__main__":
-    try: consume()
-    except KeyboardInterrupt: logger.info("Shutdown requested via KeyboardInterrupt.")
-    finally: shutdown()
+    try:
+        consume()
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested via KeyboardInterrupt.")
+    finally:
+        shutdown()

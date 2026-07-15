@@ -27,7 +27,9 @@ SELECT
         WHEN h.transactions_per_hour >= 10 THEN 'HIGH_FREQUENCY'
         ELSE 'NORMAL'
     END AS fraud_flag
-FROM {{ ref('fact_transactions') }} f
-LEFT JOIN hourly_activity h
-    ON f.account_id=h.account_id
-AND DATE_TRUNC('hour',f.transaction_date)=h.transaction_hour
+FROM {{ ref('fact_transactions') }} as f
+LEFT JOIN hourly_activity as h
+    ON
+        f.account_id = h.account_id
+        AND DATE_TRUNC('hour', f.transaction_date) = h.transaction_hour
+--

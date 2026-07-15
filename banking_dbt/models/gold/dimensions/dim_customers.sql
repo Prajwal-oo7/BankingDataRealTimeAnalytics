@@ -15,3 +15,4 @@ SELECT
     dbt_valid_to AS effective_to,
     dbt_valid_to IS NULL AS is_current
 FROM {{ ref('customers_snapshot') }}
+--
