@@ -5,7 +5,6 @@
     schema='GOLD'
 ) }}
 
-
 SELECT
     {{ dbt_utils.generate_surrogate_key(
         ['transaction_id']
@@ -28,14 +27,10 @@ LEFT JOIN {{ ref('dim_accounts') }} as a
     ON
         t.account_id = a.account_id
         AND a.is_current = TRUE
-
-WHERE (t.cdc_operation != 'd' OR t.cdc_operation IS NULL)
-
-{% if is_incremental() %}
-    
-    AND ( t.ingestion_timestamp > (SELECT COALESCE(MAX(ingestion_timestamp),'1900-01-01') FROM {{ this }})
-            OR t.transaction_id NOT IN(SELECT transaction_id FROM {{ this }})
-    )
-
-{% endif %}
---
+WHERE
+    (t.cdc_operation != 'd' OR t.cdc_operation IS NULL)
+    {% if is_incremental() %}
+        AND (t.ingestion_timestamp > (SELECT COALESCE(MAX(this_t.ingestion_timestamp), '1900-01-01') FROM {{ this }} as this_t)
+                OR t.transaction_id NOT IN (SELECT this_t.transaction_id FROM {{ this }} as this_t)
+        )
+    {% endif %}
